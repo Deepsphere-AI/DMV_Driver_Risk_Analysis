@@ -34,22 +34,25 @@ from lime import lime_tabular
 import streamlit.components.v1 as components
 import base64
 import sweetviz
-from DSAI_Data_Read_Bigquery.DSAI_Read_Training_Data import ReadTrainingData
+from DSAI_Bigquery_Impl.DSAI_BQ_Operations import RequestToBigquery,TestDataResponseToBigquery
 
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OrdinalEncoder
 
 import matplotlib.pyplot as plt
+
+# Recursive Feature Elimination
+from sklearn.feature_selection import RFE
+from sklearn.impute import SimpleImputer
+
 
 
 
 def DriverRiskClassification():
     
-    # if "vAR_model" not in vAR_st.session_state: 
-    #     vAR_st.session_state = {}
     
-    # try:
 
     vAR_df = None
     vAR_test = None
@@ -72,55 +75,25 @@ def DriverRiskClassification():
     if vAR_dataset is not None:
         
         
-        # vAR_df = ReadTrainingData()
-        vAR_df = pd.read_csv(vAR_dataset)
-        print('len - ',len(vAR_df))
+        vAR_raw_df = pd.read_csv(vAR_dataset)
+        
+        print('len - ',len(vAR_raw_df))
+        
+        
+        
         
         
         if "training_data" not in vAR_st.session_state:
-            # vAR_df.fillna(0,inplace=True)
-            # print('info - ',vAR_df.info())
-            
-            # vAR_df["dtDiss"].fillna("1800-01-01",inplace=True)
-            # vAR_df["Sec3"].fillna("XX",inplace=True)
-            # vAR_df["Sec4"].fillna("XX",inplace=True)
-            # vAR_df["Sec5"].fillna("XX",inplace=True)
-            # vAR_df["Sec6"].fillna("XX",inplace=True)
-            
-            # vAR_df["Sec7"].fillna(0,inplace=True)
-            # vAR_df["Sec8"].fillna(0,inplace=True)
-            # vAR_df["DISM_CORR_IND"].fillna("XX",inplace=True)
-            # vAR_df["FTA_DESTR_IND"].fillna(0,inplace=True)
-            # vAR_df.FTA_DESTR_IND = vAR_df.FTA_DESTR_IND.astype(float)
-            # vAR_df["FTP_IND"].fillna(0,inplace=True)
-            # vAR_df.FTP_IND = vAR_df.FTP_IND.astype(float)
-            # vAR_df['LABELS'] = vAR_df['LABEL'].replace({'LOW-SEVERITY': 0, 'INJURY CRASH': 1, 'FATAL CRASH': 2})
+            RequestToBigquery(vAR_raw_df)
+            # This is to remove last 4 columns - CREATED_BY,CREATED_AT,UPDATED_BY,UPDATED_AT
+            vAR_df = vAR_raw_df.drop(columns=vAR_raw_df.columns[-4:], axis=1)
             vAR_st.session_state["training_data"] = vAR_df
+            
         
         
     if vAR_st.session_state["training_data"] is not None:
         
-        col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
-        with col2:
-            vAR_st.write('')
-            vAR_st.write('')
-            vAR_st.subheader('Preview Data')
-            
-
-        with col4:
-            vAR_st.write('')
-            vAR_st.write('')
-            vAR_preview_data = vAR_st.button("Preview Data")
-            
-        
-        
-        if vAR_preview_data:
-            col1,col2,col3 = vAR_st.columns([1.5,10,1.5])
-            with col2:
-                
-                vAR_st.write('')
-                vAR_st.write('')
-                vAR_st.dataframe(data=vAR_st.session_state["training_data"])
+        Preview_Data(vAR_st.session_state["training_data"],"train_preview")
                 
         col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
         
@@ -137,21 +110,14 @@ def DriverRiskClassification():
             col1,col2,col3 = vAR_st.columns([0.4,10,1])
             with col2:
                 vAR_analysis = sweetviz.analyze(vAR_st.session_state["training_data"],pairwise_analysis="on")
-                # vAR_analysis.show_html('DataAnalysis.html')   
-                # vAR_analysis.show_notebook()
                 
-                # raw_html = html_object._repr_html_()
 
-                # components.v1.html(vAR_analysis.show_notebook()._repr_html_())
                 vAR_analysis.show_html(filepath=r'C:\Users\ds_007\Desktop\DMV_Driver_Risk_Prediction\DataAnalysis.html', open_browser=False, layout='vertical', scale=1.0)
-                
                 # vAR_analysis.show_html(filepath='/tmp/DataAnalysis.html', open_browser=False, layout='vertical', scale=1.0)
                 
                 with open(r'C:\Users\ds_007\Desktop\DMV_Driver_Risk_Prediction\DataAnalysis.html', 'r') as f:
                 # with open('/tmp/DataAnalysis.html', 'r') as f:
                     raw_html = f.read().encode("utf-8")
-                    # raw_html = base64.b64encode(raw_html).decode()
-                src = f"data:text/html;base64,{raw_html}"
             col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
             with col4:
                 vAR_st.download_button(label="Download EDA Report",
@@ -163,13 +129,16 @@ def DriverRiskClassification():
                 # components.iframe(src=src, width=1100, height=2500, scrolling=True)
         if vAR_st.session_state["training_data"] is not None:
             
-            Feature_Selection(vAR_st.session_state["training_data"])
+            selector,vAR_features = Feature_Selection(vAR_st.session_state["training_data"])
+            
+            # if "selector" not in vAR_st.session_state:
+            #     vAR_st.session_state["selector"] = selector
             
             col1,col2,col3 = vAR_st.columns([1.5,10,1.5])
             with col2:
                 vAR_st.write('')
                 vAR_st.write('')
-                vAR_st.info('**Note : We took only potential features based on EDA.**')
+                vAR_st.info('**Note : We took only potential features based on EDA&RFE(Recursive Feature Elimination) Technnique.**')
             
             
         # Model Training
@@ -195,7 +164,7 @@ def DriverRiskClassification():
                         
             if vAR_model_train:
                 if "vAR_model" not in vAR_st.session_state and "X_train" not in vAR_st.session_state and "X_train_cols" not in vAR_st.session_state:
-                    vAR_st.session_state['vAR_model'],vAR_st.session_state['X_train'],vAR_st.session_state['X_train_cols'] = Train_Model(vAR_st.session_state["training_data"])
+                    vAR_st.session_state['vAR_model'],vAR_st.session_state['X_train'],vAR_st.session_state['X_train_cols'] = Train_Model(vAR_st.session_state["training_data"],vAR_features,selector)
 
             # Model Testing
             
@@ -215,28 +184,7 @@ def DriverRiskClassification():
                 
                 # Preview Test Data
                     
-                col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
-                with col2:
-                    vAR_st.write('')
-                    vAR_st.write('')
-                    vAR_st.subheader('Preview Data')
-                    
-
-                with col4:
-                    vAR_st.write('')
-                    vAR_st.write('')
-                    vAR_preview_data = vAR_st.button("Preview Data",key="test_preview")
-                    
-                
-                
-                if vAR_preview_data:
-                    col1,col2,col3 = vAR_st.columns([1.5,10,1.5])
-                    with col2:
-                        
-                        vAR_st.write('')
-                        vAR_st.write('')
-                        vAR_st.dataframe(data=vAR_test_data)
-                
+                Preview_Data(vAR_test_data,"test_preview")
                 
                 
                 col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
@@ -253,69 +201,13 @@ def DriverRiskClassification():
             
                     
             if vAR_test:
-                vAR_df_columns = vAR_test_data.columns
-            
-                vAR_numeric_columns = vAR_test_data._get_numeric_data().columns 
                 
-                vAR_categorical_column = list(set(vAR_df_columns) - set(vAR_numeric_columns))
+                vAR_test_data = Test_Model(vAR_test_data)
                 
-                vAR_model = vAR_st.session_state['vAR_model']
+                if "vAR_tested_log" not in  vAR_st.session_state:
+                    vAR_st.session_state["vAR_tested_log"] = True
+                        
                 
-                data_encoded = pd.get_dummies(vAR_test_data, columns=vAR_categorical_column)
-                
-                                
-                # Later this can be removed
-                cols = ['SEC1_A12500D', 'SEC1_A14600A', 'SEC1_A21455', 'SEC1_A21710', 'SEC1_A22348B', 'SEC1_A22406A', 'SEC1_A23109C', 'SEC1_A23152', 'SEC1_A23153A', 'SEC1_A23153B', 'SEC1_A27156B', 'SEC1_A27315E', 'SEC1_A4000A', 'SEC1_A4000A1', 'SEC1_A5200A', 'SEC1_C11550A']
-                
-                for col in cols:
-                    data_encoded[col] = [False]*len(data_encoded)
-                
-                data_encoded = data_encoded[vAR_st.session_state['X_train_cols']]
-                
-                print('vAR_numeric_columns test- ',vAR_numeric_columns)
-
-                print('vAR_categorical_column test- ',vAR_categorical_column)
-                
-                print('data_encoded cols test- ',data_encoded.columns)
-                
-                # Logistic Regression requires feature scaling, so let's scale our features
-                scaler = StandardScaler()
-                X_test_scaled = scaler.fit_transform(data_encoded)
-                            
-                col1,col2,col3 = vAR_st.columns([3,15,1])
-                
-                with col2:
-                    
-                
-                    # Predict probabilities on the test data
-                    y_pred_proba_log_reg = vAR_model.predict_proba(X_test_scaled)
-                    
-                    print('y_pred_proba_log_reg - ',y_pred_proba_log_reg)
-                    
-                    print('y_pred_proba_log_reg type- ',type(y_pred_proba_log_reg))
-
-                    # Convert to DataFrame for better visualization
-                    y_pred_proba_log_reg_df = pd.DataFrame(y_pred_proba_log_reg, columns=['INJURY CRASH','LOW-SEVERITY'])
-                    
-                    print('y_pred_proba_log_reg_df - ',y_pred_proba_log_reg_df)
-                    
-
-                    
-                    vAR_test_data["INJURY CRASH"] = y_pred_proba_log_reg_df["INJURY CRASH"]
-                    
-                    vAR_test_data["LOW-SEVERITY"] = y_pred_proba_log_reg_df["LOW-SEVERITY"]
-                    
-                    
-                    if "vAR_test_data" not in vAR_st.session_state:
-                        vAR_test_data['LABEL'] = vAR_test_data[['INJURY CRASH', 'LOW-SEVERITY']].where(lambda x: x > 0.5).idxmax(axis=1)
-                        vAR_st.session_state["vAR_test_data"] = vAR_test_data
-                    
-                    vAR_st.write('')
-                    vAR_st.write('')
-                    vAR_st.write(vAR_test_data)
-                    
-                    if "vAR_tested_log" not in  vAR_st.session_state:
-                        vAR_st.session_state["vAR_tested_log"] = True
             if vAR_st.session_state["vAR_tested_log"]:
                     
                 col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
@@ -342,6 +234,80 @@ def DriverRiskClassification():
                     
                     ModelOutcomeSummary(vAR_st.session_state["vAR_test_data"])
                     
+                    
+                # Uncomment below code for XAI
+                
+                # col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
+            
+                # with col2:
+                #     vAR_st.write('')
+                #     vAR_st.write('')
+                #     vAR_st.write('')
+                #     vAR_st.subheader("Select Driver ID For XAI")
+                    
+                    
+                    
+                # with col4:
+                #     vAR_st.write('')
+                #     vAR_st.write('')
+                    
+                #     vAR_idx_values = ['Select Driver Id'] 
+                #     vAR_idx_values.extend([item for item in vAR_test_data.index])               
+                #     vAR_test_id = vAR_st.selectbox(' ',vAR_idx_values)
+                    
+                    
+                
+                # if vAR_test_id!='Select Driver Id': 
+                    
+                    
+                #     vAR_df_columns = vAR_test_data.columns
+            
+                #     vAR_numeric_columns = vAR_test_data._get_numeric_data().columns 
+                    
+                #     vAR_categorical_column = list(set(vAR_df_columns) - set(vAR_numeric_columns))
+                    
+                #     # Encode Test Data
+                #     # To fill categorical NaN column
+                #     for col in vAR_categorical_column:
+                #         vAR_test_data[col].fillna('Missing', inplace=True)
+                    
+                #     # To fill Integer NaN column
+                #     for col in vAR_numeric_columns:
+                #         vAR_test_data[col].fillna(10000, inplace=True)
+                    
+                #     # data_encoded = pd.get_dummies(vAR_train_df, columns=vAR_categorical_column)
+                #     encoder = OrdinalEncoder()
+                #     vAR_test_data[vAR_categorical_column] = encoder.fit_transform(vAR_test_data[vAR_categorical_column])
+                    
+                #     data_encoded = vAR_test_data
+                #     vAR_data_encoded_cols = data_encoded.columns
+
+                #     print('type dataencoded - ',type(data_encoded))
+                #     print('dataencoded cols - ',vAR_data_encoded_cols)
+                    
+                #     data_encoded = data_encoded[vAR_st.session_state['X_train_cols']]
+    
+                    
+                #     vAR_model,X_train = vAR_st.session_state['vAR_model'],vAR_st.session_state['X_train']
+                #     features = X_train.columns
+                    
+                #     print('features - ',features)
+                #     col1,col2,col3 = vAR_st.columns([1,15,1])
+                    
+                #     with col2:
+                        
+                #         vAR_st.write('')
+                #         vAR_st.markdown('<hr style="border:2px solid gray;">', unsafe_allow_html=True)
+                #         vAR_st.write('')
+                #         vAR_st.markdown("<div style='text-align: center; color: black;font-weight:bold;'>Explainable AI with LIME(Local  Interpretable Model-agnostic Explanations) Technique</div>", unsafe_allow_html=True)
+                #         vAR_st.write('')
+                #         vAR_st.write('')
+                #         vAR_st.write('')
+                #         vAR_st.write('')
+                #         ExplainableAI(X_train,features,vAR_model,data_encoded,vAR_test_id)
+                #         # SHAPExplainableAI(X_train,vAR_model,data_encoded,vAR_test_id)
+                
+                    
                         
                         
                 
@@ -362,9 +328,7 @@ def DriverRiskClassification():
             
                 
             
-def Preview_Data(vAR_df):
-    
-    print('len in preview - ',len(vAR_df))
+def Preview_Data(vAR_df,mode):
     
     col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
     with col2:
@@ -376,29 +340,70 @@ def Preview_Data(vAR_df):
     with col4:
         vAR_st.write('')
         vAR_st.write('')
-        vAR_preview_data = vAR_st.button("Preview Data")
+        vAR_preview_data = vAR_st.button("Preview Data",key=mode)
         
-        
+    
+    
     if vAR_preview_data:
-        
-        
         col1,col2,col3 = vAR_st.columns([1.5,10,1.5])
-        
         with col2:
-            vAR_st.write('')
-            vAR_st.write('')
-            vAR_st.dataframe(data=vAR_df,height=310)
-            # vAR_st.info(" Note: Risk Score Calculated Based on Feature Weightage")
             
-        
+            vAR_st.write('')
+            vAR_st.write('')
+            vAR_st.dataframe(data=vAR_df)
+            
+    
 
 def Feature_Selection(vAR_df):
     
     vAR_columns =["All"]
-    vAR_potential_features = ["DRIVER_AGE","SEC1","COURT","DISM_CORR_IND","RES_COUNTY","YEARS_OF_EXP",
-                              "DACTYPE","CRASH_TIME","NO_OF_INJURIES","NO_OF_FATALS","SOBRIETY","PHYS_COND","CITED"]
+    # vAR_potential_features = ["DRIVER_AGE","SEC1","COURT","DISM_CORR_IND","RES_COUNTY","YEARS_OF_EXP",
+    #                           "DACTYPE","CRASH_TIME","NO_OF_INJURIES","NO_OF_FATALS","SOBRIETY","PHYS_COND","CITED"]
     col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
-    vAR_columns.extend(vAR_potential_features)
+    
+    
+    
+    vAR_train_df = vAR_df.drop(vAR_df.columns[-1],axis=1)
+    
+    vAR_df_columns = vAR_train_df.columns
+    
+    print('vAR_df_columns - ',vAR_df_columns)
+        
+    vAR_numeric_columns = vAR_train_df._get_numeric_data().columns 
+    
+    vAR_categorical_column = list(set(vAR_df_columns) - set(vAR_numeric_columns))
+    print('vAR_df_cat_columns - ',vAR_categorical_column)
+    
+    # To fill categorical NaN column
+    for col in vAR_categorical_column:
+        vAR_train_df[col].fillna('Missing', inplace=True)
+    
+    # To fill Integer NaN column
+    for col in vAR_numeric_columns:
+        vAR_train_df[col].fillna(10000, inplace=True)
+        
+    print('traindf - ',vAR_train_df.head())
+    
+    # data_encoded = pd.get_dummies(vAR_train_df, columns=vAR_categorical_column)
+    encoder = OrdinalEncoder()
+    vAR_train_df[vAR_categorical_column] = encoder.fit_transform(vAR_train_df[vAR_categorical_column])
+    
+    data_encoded = vAR_train_df
+    print('traindf encoded - ',data_encoded.head())
+    vAR_data_encoded_cols = data_encoded.columns
+
+    # Add the one-hot encoded variables to the dataset and remove the original 'Vehicle_Type' column
+    # data_encoded.drop(vAR_categorical_column, axis=1, inplace=True)
+
+    # Label encoding for 'Crash_Level'
+    label_enc = LabelEncoder()
+    data_encoded['Crash_Level'] = label_enc.fit_transform(data_encoded[data_encoded.columns[-1]])
+
+    # Split the data into features (X) and target (y)
+    X = data_encoded.drop(data_encoded.columns[-1],axis=1)
+    y = vAR_df.iloc[: , -1:]
+    
+    vAR_columns.extend(vAR_df_columns)
     
     with col2:
         
@@ -421,32 +426,68 @@ def Feature_Selection(vAR_df):
                 for i in range(0,len(vAR_features)):
                     vAR_st.write('Feature',i+1,':',vAR_features[i])
                     
-                    
-                    
-       
+            
+    
+    print('features - ',vAR_features)   
+    
+    estimator = LogisticRegression(max_iter=10000)
+    
+    
+    if 'All' in vAR_features:
+        print('vAR_features in All scenario - ',vAR_df_columns)
+        selector = RFE(estimator, n_features_to_select=len(vAR_df_columns))
+        selector = selector.fit(X, y)
+        return selector,vAR_df_columns
+    
+    else:
+        selector = RFE(estimator, n_features_to_select=len(vAR_features))
+        selector = selector.fit(X, y)
+    
+    
+    
+    print('top_features_rfe - ',selector.support_)
+    
+    # top_features = [i for i, x in enumerate(selector.support_) if x]
+
+    
+    
+
+    return selector,vAR_features
+                      
         
             
-def Train_Model(vAR_df):
-    
-    vAR_df = vAR_df[["DRIVER_AGE","SEC1","COURT","DISM_CORR_IND","RES_COUNTY","YEARS_OF_EXP",
-                              "DACTYPE","CRASH_TIME","NO_OF_INJURIES","NO_OF_FATALS","SOBRIETY","PHYS_COND","CITED","LABEL"]].copy()
+def Train_Model(vAR_df,vAR_features,selector):
     
     vAR_train_df = vAR_df.drop(vAR_df.columns[-1],axis=1)
     
+    
+    
+    
     vAR_df_columns = vAR_train_df.columns
+    
+    print('vAR_df_columns - ',vAR_df_columns)
         
     vAR_numeric_columns = vAR_train_df._get_numeric_data().columns 
     
     vAR_categorical_column = list(set(vAR_df_columns) - set(vAR_numeric_columns))
+    print('vAR_df_cat_columns - ',vAR_categorical_column)
     
-    data_encoded = pd.get_dummies(vAR_train_df, columns=vAR_categorical_column)
+    # To fill categorical NaN column
+    for col in vAR_categorical_column:
+        vAR_train_df[col].fillna('Missing', inplace=True)
     
-    print('vAR_numeric_columns - ',vAR_numeric_columns)
+    # To fill Integer NaN column
+    for col in vAR_numeric_columns:
+        vAR_train_df[col].fillna(10000, inplace=True)
+        
+    print('traindf - ',vAR_train_df.head())
     
-    print('vAR_categorical_column - ',vAR_categorical_column)
+    # data_encoded = pd.get_dummies(vAR_train_df, columns=vAR_categorical_column)
+    encoder = OrdinalEncoder()
+    vAR_train_df[vAR_categorical_column] = encoder.fit_transform(vAR_train_df[vAR_categorical_column])
     
-    print('data_encoded cols - ',data_encoded.columns)
-    
+    data_encoded = vAR_train_df
+    print('traindf encoded - ',data_encoded.head())
     vAR_data_encoded_cols = data_encoded.columns
 
     # Add the one-hot encoded variables to the dataset and remove the original 'Vehicle_Type' column
@@ -458,12 +499,32 @@ def Train_Model(vAR_df):
 
     # Split the data into features (X) and target (y)
     X = data_encoded.drop(data_encoded.columns[-1],axis=1)
+    X_train_raw = data_encoded.copy()
+    X_train_raw.drop(X_train_raw.columns[-1],axis=1,inplace=True)
+    
+    print('X_train_raw cols - ',X_train_raw.columns)
     y = vAR_df.iloc[: , -1:]
     
+    print('top_features in model train part - ',selector.support_)
+    
+    X = selector.transform(X)
+    # vAR_df = vAR_df[["DRIVER_AGE","SEC1","COURT","DISM_CORR_IND","RES_COUNTY","YEARS_OF_EXP",
+    #                           "DACTYPE","CRASH_TIME","NO_OF_INJURIES","NO_OF_FATALS","SOBRIETY","PHYS_COND","CITED","LABEL"]].copy()
     
     
-    print('X cols - ',X.columns)
-    print('y cols - ',y.columns)
+    
+    print('vAR_numeric_columns - ',vAR_numeric_columns)
+    
+    print('vAR_categorical_column - ',vAR_categorical_column)
+    
+    print('data_encoded cols - ',data_encoded.columns)
+    
+    
+    
+    
+    
+    # print('X cols - ',X.columns)
+    # print('y cols - ',y.columns)
     
     print('data_encoded Crash Level - ',data_encoded['Crash_Level'])
 
@@ -489,8 +550,91 @@ def Train_Model(vAR_df):
     
     print('LABELS - ',log_reg.classes_)
     
-    return log_reg,X_train,vAR_data_encoded_cols
+    return log_reg,X_train_raw,vAR_features
 
+
+
+def Test_Model(vAR_test_data):
+    
+    print('vAR_test_data cols before- ',vAR_test_data.columns)
+    
+    vAR_test_data = vAR_test_data[vAR_st.session_state['X_train_cols']]
+    
+    print('vAR_test_data cols after- ',vAR_test_data.columns)
+    
+    vAR_df_columns = vAR_test_data.columns
+            
+    vAR_numeric_columns = vAR_test_data._get_numeric_data().columns 
+    
+    vAR_categorical_column = list(set(vAR_df_columns) - set(vAR_numeric_columns))
+    
+    vAR_model = vAR_st.session_state['vAR_model']
+    
+    # To fill categorical NaN column
+    for col in vAR_categorical_column:
+        vAR_test_data[col].fillna('Missing', inplace=True)
+    
+    # To fill Integer NaN column
+    for col in vAR_numeric_columns:
+        vAR_test_data[col].fillna(10000, inplace=True)
+    
+    # data_encoded = pd.get_dummies(vAR_train_df, columns=vAR_categorical_column)
+    encoder = OrdinalEncoder()
+    vAR_test_data[vAR_categorical_column] = encoder.fit_transform(vAR_test_data[vAR_categorical_column])
+    
+    data_encoded = vAR_test_data
+    vAR_data_encoded_cols = data_encoded.columns
+
+    print('type dataencoded - ',type(data_encoded))
+    print('dataencoded cols - ',vAR_data_encoded_cols)
+    
+    data_encoded = data_encoded[vAR_st.session_state['X_train_cols']]
+        
+    print('vAR_numeric_columns test- ',vAR_numeric_columns)
+
+    print('vAR_categorical_column test- ',vAR_categorical_column)
+    
+    print('data_encoded cols test- ',data_encoded.columns)
+    
+    # Logistic Regression requires feature scaling, so let's scale our features
+    scaler = StandardScaler()
+    X_test_scaled = scaler.fit_transform(data_encoded)
+                
+    col1,col2,col3 = vAR_st.columns([3,15,1])
+    
+    with col2:
+        
+    
+        # Predict probabilities on the test data
+        y_pred_proba_log_reg = vAR_model.predict_proba(X_test_scaled)
+        
+        print('y_pred_proba_log_reg - ',y_pred_proba_log_reg)
+        
+        print('y_pred_proba_log_reg type- ',type(y_pred_proba_log_reg))
+
+        # Convert to DataFrame for better visualization
+        y_pred_proba_log_reg_df = pd.DataFrame(y_pred_proba_log_reg, columns=['INJURY CRASH','LOW-SEVERITY'])
+        
+        print('y_pred_proba_log_reg_df - ',y_pred_proba_log_reg_df)
+        
+        
+        vAR_test_data["INJURY CRASH"] = y_pred_proba_log_reg_df["INJURY CRASH"]
+        
+        vAR_test_data["LOW-SEVERITY"] = y_pred_proba_log_reg_df["LOW-SEVERITY"]
+        
+        
+        if "vAR_test_data" not in vAR_st.session_state:
+            vAR_test_data['LABEL'] = vAR_test_data[['INJURY CRASH', 'LOW-SEVERITY']].where(lambda x: x > 0.5).idxmax(axis=1)
+            vAR_st.session_state["vAR_test_data"] = vAR_test_data
+            # Ingest model outcome into Bigquery Table
+            TestDataResponseToBigquery(vAR_test_data)
+        
+        vAR_st.write('')
+        vAR_st.write('')
+        vAR_st.write(vAR_test_data)
+        
+        return vAR_test_data
+                
 
 
 def dataframe_to_base64(df):
@@ -530,3 +674,32 @@ def ModelOutcomeSummary(vAR_test_data):
 
     
     
+    
+def ExplainableAI(X_train,features,vAR_model,vAR_test_data,test_id):
+    
+    print('train type - ',type(X_train))
+    print('X_train - ',X_train.columns)
+    print('vAR_test_data - ',type(vAR_test_data))
+    print('dtypes - ',vAR_test_data.dtypes)
+    print('test cols - ',vAR_test_data.columns)
+    explainer_lime = lime_tabular.LimeTabularExplainer(X_train.values, 
+                                              feature_names=features, 
+                                              class_names=['INJURY CRASH', 'LOW-SEVERITY'], 
+                                              mode='classification')
+    
+    exp = explainer_lime.explain_instance(
+    vAR_test_data.iloc[int(test_id)], vAR_model.predict_proba,labels=[0,1,2],top_labels=3,num_features=5)
+    
+    # Extract LIME explanations and visualize
+    features, weights = zip(*exp.as_list())
+    chart_data = pd.DataFrame({'Feature': features, 'Weight': weights})
+    print(chart_data.head())
+    
+    
+    
+    vAR_st.dataframe(chart_data)
+    
+    vAR_st.write('')
+    
+    html = exp.as_html()
+    components.html(html, height=1000,width=1000)

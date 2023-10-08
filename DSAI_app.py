@@ -26,11 +26,12 @@ vAR_st.set_page_config(page_title="DMV Recommendation", layout="wide")
 from DSAI_Utility.DSAI_Utility import All_Initialization,CSS_Property
 
 from DSAI_Classification_Model.DSAI_Driver_Risk_Classification import DriverRiskClassification
+from DSAI_Bigquery_Impl.DSAI_BQ_Operations import InsertErrorLog
 
 import os
 import base64
 
-# os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\ds_007\Downloads\elp-2022-352222-d31d3bdb4cc7.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\ds_007\Downloads\ca-dmv-drp-dev-95cb00eb5f09.json"
 
 if __name__=='__main__':
     vAR_hide_footer = """<style>
@@ -55,35 +56,14 @@ if __name__=='__main__':
             vAR_st.write('')
             vAR_option = vAR_st.selectbox(' ',('Select a Model',"Driver Risk - Crash Level Classification"))
             
-            # vAR_option = vAR_st.selectbox('',('Select a Model',"Regression","Classification","Vertex AI - Regression (Deployed Model)","Vertex AI - Classification (Deployed Model)"))
-            
-
-        # if vAR_option=="Vertex AI - Regression (Deployed Model)":
-        #     DriverRiskPrediction()
-        
-        # elif vAR_option=="Vertex AI - Classification (Deployed Model)":
-        #     DriverRiskClassification()
-            
-        
             
         if vAR_option=="Driver Risk - Crash Level Classification":
             DriverRiskClassification()
-            
-            # elif vAR_option=="Play with LLM-RAG(Retrieval Augmented Generation)":
-            #     LLM_RAG()
-            
-        
-    
-
-
-    except KeyError as exception:
-        print('Key Error - ',str(exception))
-        # vAR_st.error(str(exception))
-        pass
         
 
     except BaseException as exception:
         print('Error in main function - ', exception)
         exception = 'Something went wrong - '+str(exception)
-        traceback.print_exc()
-        vAR_st.error(exception)
+        print('Error Traceback ### '+str(traceback.print_exc()))
+        InsertErrorLog(exception,str(traceback.print_exc()))
+        
