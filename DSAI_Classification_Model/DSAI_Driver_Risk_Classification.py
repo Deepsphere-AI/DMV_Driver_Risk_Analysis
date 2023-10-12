@@ -35,7 +35,7 @@ from lime import lime_tabular
 import streamlit.components.v1 as components
 import base64
 import sweetviz
-from DSAI_Bigquery_Impl.DSAI_BQ_Operations import RequestToBigquery,TestDataResponseToBigquery,Upload_Data_To_GCS
+from DSAI_Bigquery_Impl.DSAI_GCP_Operations import RequestToBigquery,TestDataResponseToBigquery,Upload_Data_To_GCS
 
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from sklearn.linear_model import LogisticRegression
@@ -238,75 +238,75 @@ def DriverRiskClassification():
                     
                 # Uncomment below code for XAI
                 
-                col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
+                # col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
             
-                with col2:
-                    vAR_st.write('')
-                    vAR_st.write('')
-                    vAR_st.write('')
-                    vAR_st.subheader("Select Driver ID For XAI")
+                # with col2:
+                #     vAR_st.write('')
+                #     vAR_st.write('')
+                #     vAR_st.write('')
+                #     vAR_st.subheader("Select Driver ID For XAI")
                     
                     
                     
-                with col4:
-                    vAR_st.write('')
-                    vAR_st.write('')
+                # with col4:
+                #     vAR_st.write('')
+                #     vAR_st.write('')
                     
-                    vAR_idx_values = ['Select Driver Id'] 
-                    vAR_idx_values.extend([item for item in vAR_test_data.index])               
-                    vAR_test_id = vAR_st.selectbox(' ',vAR_idx_values)
+                #     vAR_idx_values = ['Select Driver Id'] 
+                #     vAR_idx_values.extend([item for item in vAR_test_data.index])               
+                #     vAR_test_id = vAR_st.selectbox(' ',vAR_idx_values)
                     
                     
                 
-                if vAR_test_id!='Select Driver Id': 
+                # if vAR_test_id!='Select Driver Id': 
                     
                     
-                    vAR_df_columns = vAR_test_data.columns
+                #     vAR_df_columns = vAR_test_data.columns
             
-                    vAR_numeric_columns = vAR_test_data._get_numeric_data().columns 
+                #     vAR_numeric_columns = vAR_test_data._get_numeric_data().columns 
                     
-                    vAR_categorical_column = list(set(vAR_df_columns) - set(vAR_numeric_columns))
+                #     vAR_categorical_column = list(set(vAR_df_columns) - set(vAR_numeric_columns))
                     
-                    # Encode Test Data
-                    # To fill categorical NaN column
-                    for col in vAR_categorical_column:
-                        vAR_test_data[col].fillna('Missing', inplace=True)
+                #     # Encode Test Data
+                #     # To fill categorical NaN column
+                #     for col in vAR_categorical_column:
+                #         vAR_test_data[col].fillna('Missing', inplace=True)
                     
-                    # To fill Integer NaN column
-                    for col in vAR_numeric_columns:
-                        vAR_test_data[col].fillna(10000, inplace=True)
+                #     # To fill Integer NaN column
+                #     for col in vAR_numeric_columns:
+                #         vAR_test_data[col].fillna(10000, inplace=True)
                     
-                    # data_encoded = pd.get_dummies(vAR_train_df, columns=vAR_categorical_column)
-                    encoder = OrdinalEncoder()
-                    vAR_test_data[vAR_categorical_column] = encoder.fit_transform(vAR_test_data[vAR_categorical_column])
+                #     # data_encoded = pd.get_dummies(vAR_train_df, columns=vAR_categorical_column)
+                #     encoder = OrdinalEncoder()
+                #     vAR_test_data[vAR_categorical_column] = encoder.fit_transform(vAR_test_data[vAR_categorical_column])
                     
-                    data_encoded = vAR_test_data
-                    vAR_data_encoded_cols = data_encoded.columns
+                #     data_encoded = vAR_test_data
+                #     vAR_data_encoded_cols = data_encoded.columns
 
-                    print('type dataencoded - ',type(data_encoded))
-                    print('dataencoded cols - ',vAR_data_encoded_cols)
+                #     print('type dataencoded - ',type(data_encoded))
+                #     print('dataencoded cols - ',vAR_data_encoded_cols)
                     
-                    data_encoded = data_encoded[vAR_st.session_state['X_train_cols']]
+                #     data_encoded = data_encoded[vAR_st.session_state['X_train_cols']]
     
                     
-                    vAR_model,X_train = vAR_st.session_state['vAR_model'],vAR_st.session_state['X_train']
-                    features = X_train.columns
+                #     vAR_model,X_train = vAR_st.session_state['vAR_model'],vAR_st.session_state['X_train']
+                #     features = X_train.columns
                     
-                    print('features - ',features)
-                    col1,col2,col3 = vAR_st.columns([1,15,1])
+                #     print('features - ',features)
+                #     col1,col2,col3 = vAR_st.columns([1,15,1])
                     
-                    with col2:
+                #     with col2:
                         
-                        vAR_st.write('')
-                        vAR_st.markdown('<hr style="border:2px solid gray;">', unsafe_allow_html=True)
-                        vAR_st.write('')
-                        vAR_st.markdown("<div style='text-align: center; color: black;font-weight:bold;'>Explainable AI with LIME(Local  Interpretable Model-agnostic Explanations) Technique</div>", unsafe_allow_html=True)
-                        vAR_st.write('')
-                        vAR_st.write('')
-                        vAR_st.write('')
-                        vAR_st.write('')
-                        ExplainableAI(X_train,features,vAR_model,data_encoded,vAR_test_id)
-                        # SHAPExplainableAI(X_train,vAR_model,data_encoded,vAR_test_id)
+                #         vAR_st.write('')
+                #         vAR_st.markdown('<hr style="border:2px solid gray;">', unsafe_allow_html=True)
+                #         vAR_st.write('')
+                #         vAR_st.markdown("<div style='text-align: center; color: black;font-weight:bold;'>Explainable AI with LIME(Local  Interpretable Model-agnostic Explanations) Technique</div>", unsafe_allow_html=True)
+                #         vAR_st.write('')
+                #         vAR_st.write('')
+                #         vAR_st.write('')
+                #         vAR_st.write('')
+                #         ExplainableAI(X_train,features,vAR_model,data_encoded,vAR_test_id)
+                #         # SHAPExplainableAI(X_train,vAR_model,data_encoded,vAR_test_id)
                 
                     
                         

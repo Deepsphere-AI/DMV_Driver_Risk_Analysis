@@ -26,12 +26,12 @@ vAR_st.set_page_config(page_title="DMV Recommendation", layout="wide")
 from DSAI_Utility.DSAI_Utility import All_Initialization,CSS_Property
 
 from DSAI_Classification_Model.DSAI_Driver_Risk_Classification import DriverRiskClassification
-from DSAI_Bigquery_Impl.DSAI_BQ_Operations import InsertErrorLog
+from DSAI_Bigquery_Impl.DSAI_GCP_Operations import InsertErrorLog
 
 import os
 import base64
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\ds_007\Downloads\ca-dmv-drp-dev-95cb00eb5f09.json"
+# os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\ds_007\Downloads\ca-dmv-drp-dev-95cb00eb5f09.json"
 
 if __name__=='__main__':
     vAR_hide_footer = """<style>
