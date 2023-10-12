@@ -27,7 +27,6 @@ import numpy as np
 import traceback
 import shap
 from IPython.display import display, HTML
-import random
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
@@ -35,7 +34,7 @@ from lime import lime_tabular
 import streamlit.components.v1 as components
 import base64
 import sweetviz
-from DSAI_Bigquery_Impl.DSAI_BQ_Operations import RequestToBigquery,TestDataResponseToBigquery,Upload_Data_To_GCS
+from DSAI_Bigquery_Impl.DSAI_BQ_Operations import RequestToBigquery,TestDataResponseToBigquery
 
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from sklearn.linear_model import LogisticRegression
@@ -57,6 +56,8 @@ def DriverRiskClassification():
 
     vAR_df = None
     vAR_test = None
+    vAR_model = None
+    vAR_test_dataset = None
 
     col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
     vAR_result_data = pd.DataFrame()
@@ -85,10 +86,10 @@ def DriverRiskClassification():
         
         
         if "training_data" not in vAR_st.session_state:
-            # RequestToBigquery(vAR_raw_df)
-            Upload_Data_To_GCS(vAR_raw_df,"request")
+            RequestToBigquery(vAR_raw_df)
             # This is to remove last 4 columns - CREATED_BY,CREATED_AT,UPDATED_BY,UPDATED_AT
-            vAR_st.session_state["training_data"] = vAR_raw_df
+            vAR_df = vAR_raw_df.drop(columns=vAR_raw_df.columns[-4:], axis=1)
+            vAR_st.session_state["training_data"] = vAR_df
             
         
         
@@ -113,11 +114,11 @@ def DriverRiskClassification():
                 vAR_analysis = sweetviz.analyze(vAR_st.session_state["training_data"],pairwise_analysis="on")
                 
 
-                # vAR_analysis.show_html(filepath=r'C:\Users\ds_007\Desktop\DMV_Driver_Risk_Prediction\DataAnalysis.html', open_browser=False, layout='vertical', scale=1.0)
-                vAR_analysis.show_html(filepath='/tmp/DataAnalysis.html', open_browser=False, layout='vertical', scale=1.0)
+                vAR_analysis.show_html(filepath=r'C:\Users\ds_007\Desktop\DMV_Driver_Risk_Prediction\DataAnalysis.html', open_browser=False, layout='vertical', scale=1.0)
+                # vAR_analysis.show_html(filepath='/tmp/DataAnalysis.html', open_browser=False, layout='vertical', scale=1.0)
                 
-                # with open(r'C:\Users\ds_007\Desktop\DMV_Driver_Risk_Prediction\DataAnalysis.html', 'r') as f:
-                with open('/tmp/DataAnalysis.html', 'r') as f:
+                with open(r'C:\Users\ds_007\Desktop\DMV_Driver_Risk_Prediction\DataAnalysis.html', 'r') as f:
+                # with open('/tmp/DataAnalysis.html', 'r') as f:
                     raw_html = f.read().encode("utf-8")
             col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
             with col4:
@@ -165,9 +166,18 @@ def DriverRiskClassification():
                         
             if vAR_model_train:
                 if "vAR_model" not in vAR_st.session_state and "X_train" not in vAR_st.session_state and "X_train_cols" not in vAR_st.session_state:
+                    vAR_st.session_state['vAR_model'] = None
                     vAR_st.session_state['vAR_model'],vAR_st.session_state['X_train'],vAR_st.session_state['X_train_cols'] = Train_Model(vAR_st.session_state["training_data"],vAR_features,selector)
+                
+                # vAR_model,X_train,X_train_cols = Train_Model(vAR_st.session_state["training_data"],vAR_features,selector)
 
             # Model Testing
+            
+            if "counter" not in vAR_st.session_state:
+                vAR_st.session_state.counter=0
+            else:
+                vAR_st.session_state.counter +=1 
+                
             
             if vAR_st.session_state['vAR_model'] is not None:
                 col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
@@ -180,6 +190,7 @@ def DriverRiskClassification():
                     vAR_st.write('')
                     vAR_test_dataset = vAR_st.file_uploader("Choose a file",type=['csv'],key="test")
                     
+            print('type vAR_test_dataset - ',type(vAR_test_dataset))
             if vAR_test_dataset is not None:   
                 vAR_test_data = pd.read_csv(vAR_test_dataset)
                 
@@ -203,7 +214,8 @@ def DriverRiskClassification():
                     
             if vAR_test:
                 
-                vAR_test_data = Test_Model(vAR_test_data)
+                # Passing training data to train the model again while testing - because of streamlit behaviour
+                vAR_test_data = Test_Model(vAR_test_data,vAR_features,selector)
                 
                 if "vAR_tested_log" not in  vAR_st.session_state:
                     vAR_st.session_state["vAR_tested_log"] = True
@@ -215,7 +227,7 @@ def DriverRiskClassification():
                 
                 with col4:
                     if vAR_st.session_state["vAR_test_data"] is not None:
-                        vAR_st.markdown(create_download_button(vAR_test_data), unsafe_allow_html=True)
+                        vAR_st.markdown(create_download_button(vAR_st.session_state["vAR_test_data"]), unsafe_allow_html=True)
                         
                         vAR_st.write('')
                         vAR_st.write('')
@@ -235,78 +247,80 @@ def DriverRiskClassification():
                     
                     ModelOutcomeSummary(vAR_st.session_state["vAR_test_data"])
                     
+                
+                    
                     
                 # Uncomment below code for XAI
                 
-                col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
+                # col1,col2,col3,col4,col5 = vAR_st.columns([1,9,1,9,2])
             
-                with col2:
-                    vAR_st.write('')
-                    vAR_st.write('')
-                    vAR_st.write('')
-                    vAR_st.subheader("Select Driver ID For XAI")
+                # with col2:
+                #     vAR_st.write('')
+                #     vAR_st.write('')
+                #     vAR_st.write('')
+                #     vAR_st.subheader("Select Driver ID For XAI")
                     
                     
                     
-                with col4:
-                    vAR_st.write('')
-                    vAR_st.write('')
+                # with col4:
+                #     vAR_st.write('')
+                #     vAR_st.write('')
                     
-                    vAR_idx_values = ['Select Driver Id'] 
-                    vAR_idx_values.extend([item for item in vAR_test_data.index])               
-                    vAR_test_id = vAR_st.selectbox(' ',vAR_idx_values)
+                #     vAR_idx_values = ['Select Driver Id'] 
+                #     vAR_idx_values.extend([item for item in vAR_test_data.index])               
+                #     vAR_test_id = vAR_st.selectbox(' ',vAR_idx_values)
                     
                     
                 
-                if vAR_test_id!='Select Driver Id': 
+                # if vAR_test_id!='Select Driver Id': 
                     
                     
-                    vAR_df_columns = vAR_test_data.columns
+                #     vAR_df_columns = vAR_test_data.columns
             
-                    vAR_numeric_columns = vAR_test_data._get_numeric_data().columns 
+                #     vAR_numeric_columns = vAR_test_data._get_numeric_data().columns 
                     
-                    vAR_categorical_column = list(set(vAR_df_columns) - set(vAR_numeric_columns))
+                #     vAR_categorical_column = list(set(vAR_df_columns) - set(vAR_numeric_columns))
                     
-                    # Encode Test Data
-                    # To fill categorical NaN column
-                    for col in vAR_categorical_column:
-                        vAR_test_data[col].fillna('Missing', inplace=True)
+                #     # Encode Test Data
+                #     # To fill categorical NaN column
+                #     for col in vAR_categorical_column:
+                #         vAR_test_data[col].fillna('Missing', inplace=True)
                     
-                    # To fill Integer NaN column
-                    for col in vAR_numeric_columns:
-                        vAR_test_data[col].fillna(10000, inplace=True)
+                #     # To fill Integer NaN column
+                #     for col in vAR_numeric_columns:
+                #         vAR_test_data[col].fillna(10000, inplace=True)
                     
-                    # data_encoded = pd.get_dummies(vAR_train_df, columns=vAR_categorical_column)
-                    encoder = OrdinalEncoder()
-                    vAR_test_data[vAR_categorical_column] = encoder.fit_transform(vAR_test_data[vAR_categorical_column])
+                #     # data_encoded = pd.get_dummies(vAR_train_df, columns=vAR_categorical_column)
+                #     encoder = OrdinalEncoder()
+                #     vAR_test_data[vAR_categorical_column] = encoder.fit_transform(vAR_test_data[vAR_categorical_column])
                     
-                    data_encoded = vAR_test_data
-                    vAR_data_encoded_cols = data_encoded.columns
+                #     data_encoded = vAR_test_data
+                #     vAR_data_encoded_cols = data_encoded.columns
 
-                    print('type dataencoded - ',type(data_encoded))
-                    print('dataencoded cols - ',vAR_data_encoded_cols)
+                #     print('type dataencoded - ',type(data_encoded))
+                #     print('dataencoded cols - ',vAR_data_encoded_cols)
                     
-                    data_encoded = data_encoded[vAR_st.session_state['X_train_cols']]
+                #     data_encoded = data_encoded[vAR_st.session_state['X_train_cols']]
     
                     
-                    vAR_model,X_train = vAR_st.session_state['vAR_model'],vAR_st.session_state['X_train']
-                    features = X_train.columns
+                #     vAR_model,X_train = vAR_st.session_state['vAR_model'],vAR_st.session_state['X_train']
+                #     features = X_train.columns
                     
-                    print('features - ',features)
-                    col1,col2,col3 = vAR_st.columns([1,15,1])
+                #     print('features - ',features)
+                #     col1,col2,col3 = vAR_st.columns([1,15,1])
                     
-                    with col2:
+                #     with col2:
                         
-                        vAR_st.write('')
-                        vAR_st.markdown('<hr style="border:2px solid gray;">', unsafe_allow_html=True)
-                        vAR_st.write('')
-                        vAR_st.markdown("<div style='text-align: center; color: black;font-weight:bold;'>Explainable AI with LIME(Local  Interpretable Model-agnostic Explanations) Technique</div>", unsafe_allow_html=True)
-                        vAR_st.write('')
-                        vAR_st.write('')
-                        vAR_st.write('')
-                        vAR_st.write('')
-                        ExplainableAI(X_train,features,vAR_model,data_encoded,vAR_test_id)
-                        # SHAPExplainableAI(X_train,vAR_model,data_encoded,vAR_test_id)
+                #         vAR_st.write('')
+                #         vAR_st.markdown('<hr style="border:2px solid gray;">', unsafe_allow_html=True)
+                #         vAR_st.write('')
+                #         vAR_st.markdown("<div style='text-align: center; color: black;font-weight:bold;'>Explainable AI with LIME(Local  Interpretable Model-agnostic Explanations) Technique</div>", unsafe_allow_html=True)
+                #         vAR_st.write('')
+                #         vAR_st.write('')
+                #         vAR_st.write('')
+                #         vAR_st.write('')
+                #         ExplainableAI(X_train,features,vAR_model,data_encoded,vAR_test_id)
+                #         # SHAPExplainableAI(X_train,vAR_model,data_encoded,vAR_test_id)
                 
                     
                         
@@ -412,6 +426,7 @@ def Feature_Selection(vAR_df):
         vAR_st.subheader('Feature Selection')
         
     with col4:
+        
         vAR_features = vAR_st.multiselect(' ',vAR_columns,default="All")
         vAR_st.write('')
         
@@ -537,6 +552,7 @@ def Train_Model(vAR_df,vAR_features,selector):
     # Logistic Regression requires feature scaling, so let's scale our features
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
+    
     col1,col2,col3 = vAR_st.columns([1.5,10,1.5])
     with col2:
         vAR_st.info("Data Preprocessing Completed!")
@@ -554,13 +570,11 @@ def Train_Model(vAR_df,vAR_features,selector):
 
 
 
-def Test_Model(vAR_test_data):
-    
-    vAR_col_index = []
+def Test_Model(vAR_test_data,vAR_features,selector):
     
     print('vAR_test_data cols before- ',vAR_test_data.columns)
     
-    vAR_test_data = vAR_test_data[vAR_st.session_state['X_train_cols']]
+    vAR_test_data = vAR_test_data[vAR_features]
     
     print('vAR_test_data cols after- ',vAR_test_data.columns)
     
@@ -570,11 +584,10 @@ def Test_Model(vAR_test_data):
     
     vAR_categorical_column = list(set(vAR_df_columns) - set(vAR_numeric_columns))
     
-    vAR_model = vAR_st.session_state['vAR_model']
+    vAR_model,X_train,X_train_cols = Train_Model(vAR_st.session_state["training_data"],vAR_features,selector)
     
     # To fill categorical NaN column
     for col in vAR_categorical_column:
-        vAR_col_index.append(vAR_df_columns.get_loc(col))
         vAR_test_data[col].fillna('Missing', inplace=True)
     
     # To fill Integer NaN column
@@ -591,7 +604,7 @@ def Test_Model(vAR_test_data):
     print('type dataencoded - ',type(data_encoded))
     print('dataencoded cols - ',vAR_data_encoded_cols)
     
-    data_encoded = data_encoded[vAR_st.session_state['X_train_cols']]
+    data_encoded = data_encoded[vAR_features]
         
     print('vAR_numeric_columns test- ',vAR_numeric_columns)
 
@@ -602,9 +615,6 @@ def Test_Model(vAR_test_data):
     # Logistic Regression requires feature scaling, so let's scale our features
     scaler = StandardScaler()
     X_test_scaled = scaler.fit_transform(data_encoded)
-    
-    
-    
                 
     col1,col2,col3 = vAR_st.columns([3,15,1])
     
@@ -623,37 +633,18 @@ def Test_Model(vAR_test_data):
         
         print('y_pred_proba_log_reg_df - ',y_pred_proba_log_reg_df)
         
+
         
         vAR_test_data["INJURY CRASH"] = y_pred_proba_log_reg_df["INJURY CRASH"]
         
         vAR_test_data["LOW-SEVERITY"] = y_pred_proba_log_reg_df["LOW-SEVERITY"]
         
         
-        X_test_scaled_inversed = scaler.inverse_transform(X_test_scaled)
-        
-        print('X_test_scaled_inversed type- ',type(X_test_scaled_inversed))
-        
-        print('X_test_scaled_inversed shape- ',X_test_scaled_inversed.shape)
-         
-        X_test_new = encoder.inverse_transform(X_test_scaled_inversed[:,vAR_col_index]) 
-        
-        print('X_test_new - ',X_test_new)
-        print('X_test_new type- ',type(X_test_new))
-        
-        # vAR_test_data[vAR_test_data[vAR_col_index]] = X_test_new
-        
-        for idx,cat_col in enumerate(vAR_categorical_column):
-            
-            vAR_test_data[cat_col] = X_test_new[:,idx]
-        
-        print('vAR_test_data newww- ',vAR_test_data)
-        print('vAR_test_data newww type- ',type(vAR_test_data))
-        
         if "vAR_test_data" not in vAR_st.session_state:
             vAR_test_data['LABEL'] = vAR_test_data[['INJURY CRASH', 'LOW-SEVERITY']].where(lambda x: x > 0.5).idxmax(axis=1)
             vAR_st.session_state["vAR_test_data"] = vAR_test_data
             # Ingest model outcome into Bigquery Table
-            Upload_Data_To_GCS(vAR_test_data,"response")
+            TestDataResponseToBigquery(vAR_test_data)
         
         vAR_st.write('')
         vAR_st.write('')
@@ -680,7 +671,7 @@ def ModelOutcomeSummary(vAR_test_data):
     frequencies = vAR_test_data['LABEL'].value_counts()
     
     fig, ax = plt.subplots()
-    bars = ax.bar(frequencies.index, frequencies.values, color=['blue', 'grey'])  # adjust colors as needed
+    bars = ax.bar(frequencies.index, frequencies.values, color=['blue', 'grey', 'red'])  # adjust colors as needed
     ax.set_xlabel('Label')
     ax.set_ylabel('Frequency')
     ax.set_title('Model Outcome Summary - Frequency of Crash Levels')
@@ -702,6 +693,7 @@ def ModelOutcomeSummary(vAR_test_data):
     
     
 def ExplainableAI(X_train,features,vAR_model,vAR_test_data,test_id):
+    
     print('train type - ',type(X_train))
     print('X_train - ',X_train.columns)
     print('vAR_test_data - ',type(vAR_test_data))
@@ -713,7 +705,7 @@ def ExplainableAI(X_train,features,vAR_model,vAR_test_data,test_id):
                                               mode='classification')
     
     exp = explainer_lime.explain_instance(
-    vAR_test_data.iloc[int(test_id)], vAR_model.predict_proba,top_labels=1,num_features=8,num_samples=500)
+    vAR_test_data.iloc[int(test_id)], vAR_model.predict_proba,labels=[0,1,2],top_labels=3,num_features=5)
     
     # Extract LIME explanations and visualize
     features, weights = zip(*exp.as_list())
@@ -728,49 +720,3 @@ def ExplainableAI(X_train,features,vAR_model,vAR_test_data,test_id):
     
     html = exp.as_html()
     components.html(html, height=1000,width=1000)
-
-
-
-
-# def SHAPExplainableAI(X_train,vAR_model,X_test_data,test_id):
-    
-#     # SHAP
-#     explainer = shap.LinearExplainer(vAR_model, X_train)
-#     shap_values = explainer.shap_values(X_test_data)
-    
-#     # Force plot for selected instance
-#     # shap.initjs()  # Required for visualizations
-#     # plt.figure(figsize=(20, 3))
-#     # shap.force_plot(explainer.expected_value, shap_values[test_id], X_test_data.iloc[test_id])
-#     # vAR_st.pyplot(plt.gcf())  # Display the current figure
-
-#     # Summary plot for global explanations
-#     vAR_st.write("SHAP Summary Plot:")
-#     shap.summary_plot(shap_values, X_test_data)  # Set `show=False` so it doesn't display immediately
-#     vAR_st.pyplot(plt.gcf())  # Display the current figure
-
-
-
-
-def SHAPExplainableAI(X_train,vAR_model,X_test_data,test_id):
-    
-    # Initialize the SHAP explainer for the trained model
-    explainer = shap.Explainer(vAR_model, X_train)
-
-
-    # Calculate SHAP values for the chosen instance
-    shap_values = explainer(X_test_data)
-
-    # Create a Streamlit app
-    vAR_st.title("SHAP Explainer for Logistic Regression (Multi-class Classification)")
-
-    # Display the SHAP summary plot
-    vAR_st.set_option('deprecation.showPyplotGlobalUse', False)
-    vAR_st.pyplot(shap.summary_plot(shap_values[0], X_test_data, plot_type="bar"))
-
-    # Display the force plot for the chosen instance
-    vAR_st.subheader("Force Plot for a Chosen Instance")
-    vAR_st.set_option('deprecation.showPyplotGlobalUse', False)
-    vAR_st.pyplot(shap.force_plot(explainer.expected_value, shap_values, X_test_data))
-
-

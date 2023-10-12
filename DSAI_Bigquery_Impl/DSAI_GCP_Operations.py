@@ -20,7 +20,7 @@ Google Cloud Serverless Computing   | DMV Consultant  | Ajay Gupta | Initial  | 
 
 
 import os
-from google.cloud import bigquery
+from google.cloud import bigquery,storage
 import datetime
 
 def RequestToBigquery(vAR_request_df):
@@ -135,3 +135,21 @@ def InsertErrorLog(vAR_err_code,vAR_err_context):
         
         
         
+        
+def Upload_Data_To_GCS(vAR_data,type):
+    vAR_request = vAR_data.to_csv()
+    vAR_bucket_name = os.environ['GCS_BUCKET_NAME']
+    vAR_utc_time = datetime.datetime.utcnow()
+    client = storage.Client()
+    bucket = client.get_bucket(vAR_bucket_name)
+    if type.lower()=="request":
+        vAR_file_path = os.environ["GCP_REQUEST_PATH"]+'/'+vAR_utc_time.strftime('%Y%m%d')+'/'+vAR_utc_time.strftime('%H%M%S')+".csv"
+    else:
+        vAR_file_path = os.environ["GCP_RESPONSE_PATH"]+'/'+vAR_utc_time.strftime('%Y%m%d')+'/'+vAR_utc_time.strftime('%H%M%S')+".csv"
+    vAR_file_path = vAR_file_path.lower()
+    bucket.blob(vAR_file_path).upload_from_string(vAR_request, 'text/csv')
+    print('DMV DRP Request successfully saved into cloud storage')
+    print('Path - ',vAR_file_path)
+    return vAR_file_path
+
+
